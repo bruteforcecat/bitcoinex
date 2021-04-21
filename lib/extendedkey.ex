@@ -7,7 +7,9 @@ defmodule Bitcoinex.ExtendedKey do
 
   defmodule DerivationPath do
     @moduledoc """
-    Contains a list of integers representing a bip32 derivation path
+    Contains a list of integers (or the :any atom) representing a bip32 derivation path. 
+    The :any atom represents a wildcard in the derivation path. DerivationPath structs can
+    be used by ExtendedKey.derive_extended_key to derive a child key at the given path.
     """
 
     @type t :: %__MODULE__{
@@ -30,6 +32,9 @@ defmodule Bitcoinex.ExtendedKey do
 
     defp tpath_to_string([l | rest], path_acc) do
       cond do
+        l == :any ->
+          tpath_to_string(rest, path_acc <> "*/")
+
         l >= @hardcap ->
           {:error, "index cannot be greater than 2^32-1"}
 
@@ -56,10 +61,15 @@ defmodule Bitcoinex.ExtendedKey do
     @spec string_to_path(String.t()) :: t()
     def string_to_path(pathstr), do: %__MODULE__{p: tstring_to_path(String.split(pathstr, "/"))}
 
-    defp tstring_to_path([]), do: []
-    defp tstring_to_path([""]), do: []
-    defp tstring_to_path(["m" | rest]), do: tstring_to_path(rest)
-    defp tstring_to_path([this | rest]), do: [str_to_level(this) | tstring_to_path(rest)]
+    defp tstring_to_path(path_list) do
+      case path_list do
+        [] -> []
+        [""] -> []
+        ["m" | rest] -> tstring_to_path(rest)
+        ["*" | rest] -> [:any | tstring_to_path(rest)]
+        [i | rest] -> [str_to_level(i) | tstring_to_path(rest)]
+      end
+    end
 
     defp str_to_level(level) do
       [num | tick] = String.split(level, ["'", "h"])
@@ -238,10 +248,7 @@ defmodule Bitcoinex.ExtendedKey do
 
   @spec network_from_prefix(binary) :: atom
   def network_from_prefix(prefix) do
-    cond do
-      prefix in mainnet_prefixes() -> :mainnet
-      true -> :testnet
-    end
+    if prefix in mainnet_prefixes(), do: :mainnet, else: :testnet
   end
 
   @spec script_type_from_prefix(binary) :: atom
@@ -338,19 +345,17 @@ defmodule Bitcoinex.ExtendedKey do
   def seed_to_master_private_key(<<seed::binary>>, pfx \\ :xprv) do
     prefix = pfx_atom_to_bin(pfx)
 
-    cond do
-      prefix not in prv_prefixes() ->
-        {:error, "invalid extended private key prefix"}
+    if prefix in prv_prefixes() do
+      <<key::binary-size(32), chaincode::binary-size(32)>> =
+        :crypto.hmac(:sha512, "Bitcoin seed", seed)
 
-      true ->
-        <<key::binary-size(32), chaincode::binary-size(32)>> =
-          :crypto.hmac(:sha512, "Bitcoin seed", seed)
+      depth_fingerprint_childnum = <<0, 0, 0, 0, 0, 0, 0, 0, 0>>
 
-        depth_fingerprint_childnum = <<0, 0, 0, 0, 0, 0, 0, 0, 0>>
-
-        (prefix <> depth_fingerprint_childnum <> chaincode <> <<0>> <> key)
-        |> Base58.append_checksum()
-        |> parse_extended_key()
+      (prefix <> depth_fingerprint_childnum <> chaincode <> <<0>> <> key)
+      |> Base58.append_checksum()
+      |> parse_extended_key()
+    else
+      {:error, "invalid extended private key prefix"}
     end
   end
 
@@ -364,10 +369,12 @@ defmodule Bitcoinex.ExtendedKey do
       privkey = %PrivateKey{d: :binary.decode_unsigned(xprv.key, :big)}
 
       pubkey =
-        PrivateKey.to_point(privkey)
+        privkey
+        |> PrivateKey.to_point()
         |> Point.sec()
 
-      prv_to_pub_prefix(xprv.prefix)
+      xprv.prefix
+      |> prv_to_pub_prefix()
       |> Kernel.<>(xprv.depth)
       |> Kernel.<>(xprv.parent)
       |> Kernel.<>(xprv.child_num)
@@ -387,11 +394,11 @@ defmodule Bitcoinex.ExtendedKey do
   """
   @spec to_private_key(t()) :: PrivateKey.t()
   def to_private_key(xprv) do
-    if xprv.prefix not in prv_prefixes() do
-      {:error, "key is not a extended private key."}
-    else
+    if xprv.prefix in prv_prefixes() do
       secret = :binary.decode_unsigned(xprv.key, :big)
       %PrivateKey{d: secret}
+    else
+      {:error, "key is not a extended private key."}
     end
   end
 
@@ -576,6 +583,17 @@ defmodule Bitcoinex.ExtendedKey do
 
   defp rderive_extended_key(xkey, []), do: xkey
 
-  defp rderive_extended_key(xkey, [p | rest]),
-    do: derive_child_key(xkey, p) |> rderive_extended_key(rest)
+  defp rderive_extended_key(xkey, [p | rest]) do
+    case p do
+      # if asterisk (:any) is in path, return the immediate parent xkey
+      :any ->
+        xkey
+
+      # otherwise it is an integer, so derive child at that index.
+      _ ->
+        xkey
+        |> derive_child_key(p)
+        |> rderive_extended_key(rest)
+    end
+  end
 end
