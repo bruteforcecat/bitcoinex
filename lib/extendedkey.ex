@@ -109,7 +109,7 @@ defmodule Bitcoinex.ExtendedKey do
   @type t :: %__MODULE__{
           prefix: binary,
           depth: binary,
-          parent: binary,
+          parent_fingerprint: binary,
           child_num: binary,
           chaincode: binary,
           key: binary,
@@ -119,7 +119,7 @@ defmodule Bitcoinex.ExtendedKey do
   @enforce_keys [
     :prefix,
     :depth,
-    :parent,
+    :parent_fingerprint,
     :child_num,
     :chaincode,
     :key,
@@ -129,7 +129,7 @@ defmodule Bitcoinex.ExtendedKey do
   defstruct [
     :prefix,
     :depth,
-    :parent,
+    :parent_fingerprint,
     :child_num,
     :chaincode,
     :key,
@@ -273,7 +273,7 @@ defmodule Bitcoinex.ExtendedKey do
   """
   @spec parse_extended_key(binary | String.t()) :: t()
   def parse_extended_key(
-        <<prefix::binary-size(4), depth::binary-size(1), parent::binary-size(4),
+        <<prefix::binary-size(4), depth::binary-size(1), parent_fingerprint::binary-size(4),
           child_num::binary-size(4), chaincode::binary-size(32), key::binary-size(33),
           checksum::binary-size(4)>> = xkey
       ) do
@@ -294,7 +294,7 @@ defmodule Bitcoinex.ExtendedKey do
             %__MODULE__{
               prefix: prefix,
               depth: depth,
-              parent: parent,
+              parent_fingerprint: parent_fingerprint,
               child_num: child_num,
               chaincode: chaincode,
               key: key,
@@ -329,7 +329,8 @@ defmodule Bitcoinex.ExtendedKey do
   """
   @spec serialize_extended_key(t()) :: binary
   def serialize_extended_key(xkey) do
-    (xkey.prefix <> xkey.depth <> xkey.parent <> xkey.child_num <> xkey.chaincode <> xkey.key)
+    (xkey.prefix <>
+       xkey.depth <> xkey.parent_fingerprint <> xkey.child_num <> xkey.chaincode <> xkey.key)
     |> Base58.append_checksum()
   end
 
@@ -382,7 +383,7 @@ defmodule Bitcoinex.ExtendedKey do
       xprv.prefix
       |> prv_to_pub_prefix()
       |> Kernel.<>(xprv.depth)
-      |> Kernel.<>(xprv.parent)
+      |> Kernel.<>(xprv.parent_fingerprint)
       |> Kernel.<>(xprv.child_num)
       |> Kernel.<>(xprv.chaincode)
       |> Kernel.<>(pubkey)
