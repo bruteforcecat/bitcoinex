@@ -12,32 +12,34 @@ defmodule Bitcoinex.ExtendedKey do
     be used by ExtendedKey.derive_extended_key to derive a child key at the given path.
     """
 
-    @min_non_hardened_index 0
+    @min_non_hardened_child_num 0
     # 2^31 - 1
-    @max_non_hardened_index 0x80000000 - 1
-    @min_hardened_index 0x80000000
+    @max_non_hardened_child_num 0x80000000 - 1
+    @min_hardened_child_num 0x80000000
     # 2^32 - 1
-    @max_hardened_index 0x100000000 - 1
+    @max_hardened_child_num 0x100000000 - 1
 
-    @type hardened_index :: unquote(@min_hardened_index)..unquote(@max_hardened_index)
-    @type non_hardened_index :: unquote(@min_non_hardened_index)..unquote(@max_non_hardened_index)
+    @type hardened_child_num ::
+            unquote(@min_hardened_child_num)..unquote(@max_hardened_child_num)
+    @type non_hardened_child_num ::
+            unquote(@min_non_hardened_child_num)..unquote(@max_non_hardened_child_num)
 
-    @type index :: hardened_index | non_hardened_index
+    @type child_num :: hardened_child_num | non_hardened_child_num
 
     @type t :: %__MODULE__{
-            p: list(index)
+            child_nums: list(child_num)
           }
 
     @enforce_keys [
-      :p
+      :child_nums
     ]
-    defstruct [:p]
+    defstruct [:child_nums]
 
-    def max_non_hardened_index(), do: @max_non_hardened_index
-    def max_hardened_index(), do: @max_hardened_index
+    def max_non_hardened_child_num(), do: @max_non_hardened_child_num
+    def max_hardened_child_num(), do: @max_hardened_child_num
 
     @spec path_to_string(t()) :: String.t()
-    def path_to_string(%__MODULE__{p: path}), do: tpath_to_string(path, "")
+    def path_to_string(%__MODULE__{child_nums: path}), do: tpath_to_string(path, "")
 
     defp tpath_to_string([], path_acc), do: path_acc
     defp tpath_to_string(["m" | rest], path_acc), do: tpath_to_string(rest, "m/" <> path_acc)
@@ -47,19 +49,19 @@ defmodule Bitcoinex.ExtendedKey do
         l == :any ->
           tpath_to_string(rest, path_acc <> "*/")
 
-        l >= @max_hardened_index ->
-          {:error, "index cannot be greater than #{@max_hardened_index}"}
+        l >= @max_hardened_child_num ->
+          {:error, "index cannot be greater than #{@max_hardened_child_num}"}
 
-        l < @min_non_hardened_index ->
-          {:error, "index cannot be less than #{@min_non_hardened_index}"}
+        l < @min_non_hardened_child_num ->
+          {:error, "index cannot be less than #{@min_non_hardened_child_num}"}
 
         # hardened
-        l >= @min_hardened_index ->
+        l >= @min_hardened_child_num ->
           tpath_to_string(
             rest,
             path_acc <>
               (l
-               |> Math.modulo(@min_hardened_index)
+               |> Math.modulo(@min_hardened_child_num)
                |> Integer.to_string()
                |> Kernel.<>("'/"))
           )
@@ -71,7 +73,8 @@ defmodule Bitcoinex.ExtendedKey do
     end
 
     @spec string_to_path(String.t()) :: t()
-    def string_to_path(pathstr), do: %__MODULE__{p: tstring_to_path(String.split(pathstr, "/"))}
+    def string_to_path(pathstr),
+      do: %__MODULE__{child_nums: tstring_to_path(String.split(pathstr, "/"))}
 
     defp tstring_to_path(path_list) do
       case path_list do
@@ -87,16 +90,18 @@ defmodule Bitcoinex.ExtendedKey do
       [num | tick] = String.split(level, ["'", "h"])
       nnum = String.to_integer(num)
 
-      if nnum >= @min_hardened_index or nnum < 0 do
+      if nnum >= @min_hardened_child_num or nnum < 0 do
         raise(ArgumentError, message: "invalid derivation path")
       else
         harden(nnum, tick)
       end
     end
 
-    defp harden(num, [""]), do: num + @min_hardened_index
+    defp harden(num, [""]), do: num + @min_hardened_child_num
     defp harden(num, []), do: num
-    def add(%__MODULE__{p: path1}, %__MODULE__{p: path2}), do: %__MODULE__{p: path1 ++ path2}
+
+    def add(%__MODULE__{child_nums: path1}, %__MODULE__{child_nums: path2}),
+      do: %__MODULE__{child_nums: path1 ++ path2}
   end
 
   @type t :: %__MODULE__{
@@ -454,7 +459,7 @@ defmodule Bitcoinex.ExtendedKey do
         |> derive_private_child(idx)
         |> to_extended_public_key()
 
-      idx >= DerivationPath.max_non_hardened_index() or idx < 0 ->
+      idx >= DerivationPath.max_non_hardened_child_num() or idx < 0 ->
         {:error, "idx must be in 0..2**31-1"}
 
       true ->
@@ -503,7 +508,7 @@ defmodule Bitcoinex.ExtendedKey do
   @spec derive_private_child(t(), non_neg_integer) :: t()
   def derive_private_child(xkey, idx) do
     cond do
-      idx > DerivationPath.max_hardened_index() or idx < 0 ->
+      idx > DerivationPath.max_hardened_child_num() or idx < 0 ->
         {:error, "idx must be in 0..2**32-1"}
 
       xkey.prefix not in prv_prefixes() ->
@@ -560,7 +565,7 @@ defmodule Bitcoinex.ExtendedKey do
       |> :binary.encode_unsigned()
       |> Bitcoinex.Utils.pad(4, :leading)
 
-    if idx >= DerivationPath.max_non_hardened_index() do
+    if idx >= DerivationPath.max_non_hardened_child_num() do
       # hardened child from priv key
       :crypto.hmac(:sha512, xprv.chaincode, xprv.key <> i)
     else
@@ -588,7 +593,8 @@ defmodule Bitcoinex.ExtendedKey do
     path to derive the extended key at that path
   """
   @spec derive_extended_key(t(), DerivationPath.t()) :: t()
-  def derive_extended_key(xkey, %DerivationPath{p: path}), do: rderive_extended_key(xkey, path)
+  def derive_extended_key(xkey, %DerivationPath{child_nums: path}),
+    do: rderive_extended_key(xkey, path)
 
   defp rderive_extended_key(xkey, []), do: xkey
 
