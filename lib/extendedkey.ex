@@ -461,7 +461,7 @@ defmodule Bitcoinex.ExtendedKey do
         |> derive_private_child(idx)
         |> to_extended_public_key()
 
-      idx >= DerivationPath.max_non_hardened_child_num() or idx < 0 ->
+      idx > DerivationPath.max_non_hardened_child_num() or idx < 0 ->
         {:error, "idx must be in 0..2**31-1"}
 
       true ->
