@@ -89,18 +89,27 @@ defmodule Bitcoinex.ExtendedKey do
     end
 
     defp str_to_level(level) do
-      [num | tick] = String.split(level, ["'", "h"])
+      {num, is_hardened} =
+        case String.split(level, ["'", "h"]) do
+          [num] ->
+            {num, false}
+
+          [num, ""] ->
+            {num, true}
+        end
+
       nnum = String.to_integer(num)
 
-      if nnum >= @min_hardened_child_num or nnum < 0 do
-        raise(ArgumentError, message: "invalid derivation path")
+      if nnum in @min_non_hardened_child_num..@max_non_hardened_child_num do
+        if is_hardened do
+          nnum + @min_hardened_child_num
+        else
+          nnum
+        end
       else
-        harden(nnum, tick)
+        raise(ArgumentError, message: "invalid derivation path")
       end
     end
-
-    defp harden(num, [""]), do: num + @min_hardened_child_num
-    defp harden(num, []), do: num
 
     def add(%__MODULE__{child_nums: path1}, %__MODULE__{child_nums: path2}),
       do: %__MODULE__{child_nums: path1 ++ path2}
