@@ -51,7 +51,7 @@ defmodule Bitcoinex.ExtendedKey do
         l == :any ->
           tpath_to_string(rest, path_acc <> "*/")
 
-        l >= @max_hardened_child_num ->
+        l > @max_hardened_child_num ->
           {:error, "index cannot be greater than #{@max_hardened_child_num}"}
 
         l < @min_non_hardened_child_num ->
@@ -563,7 +563,7 @@ defmodule Bitcoinex.ExtendedKey do
       |> :binary.encode_unsigned()
       |> Bitcoinex.Utils.pad(4, :leading)
 
-    if idx >= DerivationPath.max_non_hardened_child_num() do
+    if idx > DerivationPath.max_non_hardened_child_num() do
       # hardened child from priv key
       :crypto.hmac(:sha512, xprv.chaincode, xprv.key <> i)
     else
