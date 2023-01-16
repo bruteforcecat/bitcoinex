@@ -45,18 +45,25 @@ defmodule Bitcoinex.Secp256k1.Schnorr do
               {:error, "invalid aux randomness"}
             else
               r_point = PrivateKey.to_point(k0)
-              k = Secp256k1.force_even_y(k0)
 
-              e =
-                tagged_hash_challenge(Point.x_bytes(r_point) <> Point.x_bytes(d_point) <> z_bytes)
-                |> :binary.decode_unsigned()
-                |> Math.modulo(@n)
+              case Secp256k1.force_even_y(k0) do
+                {:error, msg} ->
+                  {:error, msg}
 
-              sig_s =
-                (k.d + d.d * e)
-                |> Math.modulo(@n)
+                k ->
+                  e =
+                    tagged_hash_challenge(
+                      Point.x_bytes(r_point) <> Point.x_bytes(d_point) <> z_bytes
+                    )
+                    |> :binary.decode_unsigned()
+                    |> Math.modulo(@n)
 
-              {:ok, %Signature{r: r_point.x, s: sig_s}}
+                  sig_s =
+                    (k.d + d.d * e)
+                    |> Math.modulo(@n)
+
+                  {:ok, %Signature{r: r_point.x, s: sig_s}}
+              end
             end
         end
     end
