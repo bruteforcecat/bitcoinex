@@ -68,13 +68,12 @@ defmodule Bitcoinex.Secp256k1.Ecdsa do
 
       {:ok, privkey} ->
         k = deterministic_k(privkey, z)
-        n = @n
         sig_r = PrivateKey.to_point(k).x
-        inv_k = Math.inv(k.d, n)
-        sig_s = Math.modulo((z + sig_r * privkey.d) * inv_k, n)
+        inv_k = Math.inv(k.d, @n)
+        sig_s = Math.modulo((z + sig_r * privkey.d) * inv_k, @n)
 
-        if sig_s > n / 2 do
-          %Signature{r: sig_r, s: n - sig_s}
+        if sig_s > @n / 2 do
+          %Signature{r: sig_r, s: @n - sig_s}
         else
           %Signature{r: sig_r, s: sig_s}
         end
