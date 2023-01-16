@@ -194,16 +194,20 @@ defmodule Bitcoinex.Secp256k1 do
   """
   @spec force_even_y(PrivateKey.t()) :: PrivateKey.t() | {:error, String.t()}
   def force_even_y(privkey) do
-    pubkey = PrivateKey.to_point(privkey)
+    case PrivateKey.to_point(privkey) do
+      {:error, msg} ->
+        {:error, msg}
 
-    if Point.is_inf(pubkey) do
-      {:error, "pubkey is infinity. bad luck"}
-    end
+      pubkey ->
+        if Point.is_inf(pubkey) do
+          {:error, "pubkey is infinity. bad luck"}
+        end
 
-    if Point.has_even_y(pubkey) do
-      privkey
-    else
-      %PrivateKey{d: Params.curve().n - privkey.d}
+        if Point.has_even_y(pubkey) do
+          privkey
+        else
+          %PrivateKey{d: Params.curve().n - privkey.d}
+        end
     end
   end
 
