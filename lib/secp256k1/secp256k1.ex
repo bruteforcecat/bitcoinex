@@ -10,15 +10,11 @@ defmodule Bitcoinex.Secp256k1 do
   import Bitwise
   alias Bitcoinex.Secp256k1.{Math, Params, Point, PrivateKey}
 
-  @generator_point %Point{
-    x: Params.curve().g_x,
-    y: Params.curve().g_y
-  }
-
   defmodule Signature do
     @moduledoc """
     Contains r,s in signature.
     """
+    alias Bitcoinex.Utils
 
     @type t :: %__MODULE__{
             r: pos_integer(),
