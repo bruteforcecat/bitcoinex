@@ -3,7 +3,15 @@ defmodule Bitcoinex.Secp256k1.Params do
   Secp256k1 parameters.
   http://www.secg.org/sec2-v2.pdf
   """
-  @spec curve :: map
+  @spec curve :: %{
+    p: pos_integer(),
+    a: pos_integer(),
+    b: pos_integer(),
+    g_x: pos_integer(),
+    g_y: pos_integer(),
+    n: pos_integer(),
+    h: pos_integer()
+  }
   def curve do
     %{
       p: 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFE_FFFFFC2F,
